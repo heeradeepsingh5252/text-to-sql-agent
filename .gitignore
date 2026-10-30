@@ -1,0 +1,21 @@
+# Environment and local Python environment
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Test and tooling caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# SQLite transient files (the synthetic data/pharma.db is intentionally tracked)
+*.db-shm
+*.db-wal
+
+# Editor and OS files
+.DS_Store
+.vscode/
+.idea/
