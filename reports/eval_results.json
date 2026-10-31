@@ -1,0 +1,202 @@
+[
+  {
+    "id": "Q01",
+    "question": "How many products are in the catalogue?",
+    "success": true,
+    "result_match": true,
+    "retries": 0,
+    "row_count": 1,
+    "sql": "SELECT COUNT(*) AS product_count FROM products LIMIT 200",
+    "error": null
+  },
+  {
+    "id": "Q02",
+    "question": "List all products and their categories.",
+    "success": true,
+    "result_match": true,
+    "retries": 0,
+    "row_count": 8,
+    "sql": "SELECT prod.product_name, prod.category FROM products AS prod LIMIT 200",
+    "error": null
+  },
+  {
+    "id": "Q03",
+    "question": "What is the average list price of products?",
+    "success": true,
+    "result_match": true,
+    "retries": 0,
+    "row_count": 1,
+    "sql": "SELECT AVG(list_price) FROM products LIMIT 200",
+    "error": null
+  },
+  {
+    "id": "Q04",
+    "question": "Which product has the highest list price?",
+    "success": true,
+    "result_match": true,
+    "retries": 0,
+    "row_count": 1,
+    "sql": "SELECT p.product_name, p.list_price FROM products AS p ORDER BY p.list_price DESC LIMIT 1",
+    "error": null
+  },
+  {
+    "id": "Q05",
+    "question": "Show total revenue by region.",
+    "success": true,
+    "result_match": true,
+    "retries": 0,
+    "row_count": 4,
+    "sql": "SELECT s.region, SUM(s.revenue) AS total_revenue FROM sales_transactions AS s GROUP BY s.region ORDER BY total_revenue DESC LIMIT 200",
+    "error": null
+  },
+  {
+    "id": "Q06",
+    "question": "Which product generated the most revenue?",
+    "success": true,
+    "result_match": true,
+    "retries": 0,
+    "row_count": 1,
+    "sql": "SELECT p.product_name, SUM(st.revenue) AS total_revenue FROM sales_transactions AS st JOIN products AS p ON p.product_id = st.product_id GROUP BY st.product_id, p.product_name ORDER BY total_revenue DESC LIMIT 1",
+    "error": null
+  },
+  {
+    "id": "Q07",
+    "question": "How many units were sold in each region?",
+    "success": true,
+    "result_match": true,
+    "retries": 0,
+    "row_count": 4,
+    "sql": "SELECT region, SUM(units_sold) AS total_units_sold FROM sales_transactions GROUP BY region ORDER BY total_units_sold DESC LIMIT 200",
+    "error": null
+  },
+  {
+    "id": "Q08",
+    "question": "What is the overall estimated gross profit?",
+    "success": true,
+    "result_match": true,
+    "retries": 0,
+    "row_count": 1,
+    "sql": "SELECT SUM(txn.estimated_gross_profit) AS total_estimated_gross_profit FROM sales_transactions AS txn LIMIT 200",
+    "error": null
+  },
+  {
+    "id": "Q09",
+    "question": "What is the average margin percentage by product category?",
+    "success": true,
+    "result_match": true,
+    "retries": 0,
+    "row_count": 8,
+    "sql": "SELECT prod.category, AVG(txn.margin_pct) AS avg_margin FROM sales_transactions AS txn JOIN products AS prod ON prod.product_id = txn.product_id GROUP BY prod.category ORDER BY avg_margin DESC LIMIT 200",
+    "error": null
+  },
+  {
+    "id": "Q10",
+    "question": "Show monthly revenue in 2025.",
+    "success": true,
+    "result_match": true,
+    "retries": 0,
+    "row_count": 12,
+    "sql": "SELECT STRFTIME('%Y-%m', sales.transaction_date) AS month, SUM(sales.revenue) AS total_revenue FROM sales_transactions AS sales WHERE STRFTIME('%Y', sales.transaction_date) = '2025' GROUP BY month ORDER BY month LIMIT 200",
+    "error": null
+  },
+  {
+    "id": "Q11",
+    "question": "How many transactions are recorded for Hyderabad?",
+    "success": true,
+    "result_match": true,
+    "retries": 0,
+    "row_count": 1,
+    "sql": "SELECT COUNT(*) FROM sales_transactions AS txn WHERE txn.region = 'Hyderabad' LIMIT 200",
+    "error": null
+  },
+  {
+    "id": "Q12",
+    "question": "Which five products sold the most units?",
+    "success": true,
+    "result_match": true,
+    "retries": 0,
+    "row_count": 5,
+    "sql": "SELECT p.product_name, SUM(st.units_sold) AS total_units_sold FROM sales_transactions AS st JOIN products AS p ON p.product_id = st.product_id GROUP BY p.product_name ORDER BY total_units_sold DESC LIMIT 5",
+    "error": null
+  },
+  {
+    "id": "Q13",
+    "question": "What is the total sales revenue for the Diabetes Care category?",
+    "success": true,
+    "result_match": true,
+    "retries": 0,
+    "row_count": 1,
+    "sql": "SELECT SUM(s.revenue) AS total_revenue FROM sales_transactions AS s JOIN products AS p ON p.product_id = s.product_id WHERE p.category = 'Diabetes Care' LIMIT 200",
+    "error": null
+  },
+  {
+    "id": "Q14",
+    "question": "List inventory records flagged for reorder in Hyderabad.",
+    "success": true,
+    "result_match": true,
+    "retries": 0,
+    "row_count": 28,
+    "sql": "SELECT p.product_name, i.snapshot_date, i.stock_on_hand FROM inventory_snapshot AS i JOIN products AS p ON p.product_id = i.product_id WHERE i.region = 'Hyderabad' AND i.reorder_flag = 1 ORDER BY i.snapshot_date, p.product_name LIMIT 200",
+    "error": null
+  },
+  {
+    "id": "Q15",
+    "question": "What is the minimum stock on hand by region?",
+    "success": true,
+    "result_match": true,
+    "retries": 0,
+    "row_count": 4,
+    "sql": "SELECT inv.region, MIN(inv.stock_on_hand) AS min_stock_on_hand FROM inventory_snapshot AS inv GROUP BY inv.region ORDER BY inv.region LIMIT 200",
+    "error": null
+  },
+  {
+    "id": "Q16",
+    "question": "How many inventory snapshots are below their product reorder level?",
+    "success": true,
+    "result_match": true,
+    "retries": 0,
+    "row_count": 1,
+    "sql": "SELECT COUNT(*) FROM inventory_snapshot AS inv JOIN products AS prod ON prod.product_id = inv.product_id WHERE inv.stock_on_hand < prod.reorder_level LIMIT 200",
+    "error": null
+  },
+  {
+    "id": "Q17",
+    "question": "Show the top three regions by estimated gross profit.",
+    "success": true,
+    "result_match": true,
+    "retries": 0,
+    "row_count": 3,
+    "sql": "SELECT st.region, SUM(st.estimated_gross_profit) AS total_estimated_gross_profit FROM sales_transactions AS st GROUP BY st.region ORDER BY total_estimated_gross_profit DESC LIMIT 3",
+    "error": null
+  },
+  {
+    "id": "Q18",
+    "question": "What is the earliest and latest sales transaction date?",
+    "success": true,
+    "result_match": true,
+    "retries": 0,
+    "row_count": 1,
+    "sql": "SELECT MIN(st.transaction_date) AS earliest_date, MAX(st.transaction_date) AS latest_date FROM sales_transactions AS st LIMIT 200",
+    "error": null
+  },
+  {
+    "id": "Q19",
+    "question": "How many distinct products were sold in each region?",
+    "success": true,
+    "result_match": true,
+    "retries": 0,
+    "row_count": 4,
+    "sql": "SELECT txn.region, COUNT(DISTINCT txn.product_id) AS distinct_products_sold FROM sales_transactions AS txn GROUP BY txn.region LIMIT 200",
+    "error": null
+  },
+  {
+    "id": "Q20",
+    "question": "What is the total revenue and gross profit for each year?",
+    "success": true,
+    "result_match": true,
+    "retries": 0,
+    "row_count": 2,
+    "sql": "SELECT STRFTIME('%Y', transaction_date) AS year, SUM(revenue) AS total_revenue, SUM(estimated_gross_profit) AS total_gross_profit FROM sales_transactions GROUP BY year ORDER BY year LIMIT 200",
+    "error": null
+  }
+]

@@ -1,5 +1,5 @@
 
-"""Paced, single-pass evaluation of the Text-to-SQL agent."""
+"""Paced evaluation of the Text-to-SQL agent with provider retry handling."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from app.schema import get_schema_description
 from app.sql_guard import validate_select_only
 
 ROOT = Path(__file__).resolve().parents[1]
+MAX_PROVIDER_ATTEMPTS = 3
 
 
 def normalize_value(value: Any) -> tuple[str, Any]:
@@ -66,10 +67,9 @@ def results_match(
 def write_reports(
     results: list[dict[str, Any]],
     total_questions: int,
-    stop_reason: str | None,
     settings: Settings,
 ) -> None:
-    """Save measured results, including partial runs."""
+    """Save benchmark results, including partial failures."""
     attempted = len(results)
     successful = sum(bool(item["success"]) for item in results)
     matched = sum(bool(item["result_match"]) for item in results)
@@ -80,6 +80,14 @@ def write_reports(
         else 0.0
     )
 
+    overall_accuracy = (
+        matched / attempted * 100 if attempted else 0.0
+    )
+
+    successful_accuracy = (
+        matched / successful * 100 if successful else 0.0
+    )
+
     lines = [
         "# Text-to-SQL Evaluation Results",
         "",
@@ -88,24 +96,20 @@ def write_reports(
         f"- Total benchmark questions: {total_questions}",
         f"- Questions attempted: {attempted}/{total_questions}",
         f"- Successful executions: {successful}/{attempted}",
-        f"- Correct result matches: {matched}/{successful}",
-        f"- Average retries: {average_retries:.2f}",
-        "- Evaluation mode: one SQL-generation request per question",
+        f"- Correct result matches: {matched}/{attempted}",
+        f"- Overall benchmark accuracy: {overall_accuracy:.2f}%",
+        f"- Accuracy among successful executions: {successful_accuracy:.2f}%",
+        f"- Average provider retries: {average_retries:.2f}",
+        "- Evaluation mode: one successful SQL-generation response per question, with up to three provider attempts",
         "- Answer generation excluded to reduce API consumption",
         "- SQL aliases and output row ordering ignored during comparison",
         "- Numeric values rounded to two decimal places for comparison",
         "",
-    ]
-
-    if stop_reason:
-        lines.extend(["## Evaluation stopped early", "", stop_reason, ""])
-
-    lines.extend([
         "## Per-question results",
         "",
         "| ID | Executed | Result matched | Retries | Rows |",
         "|---|---:|---:|---:|---:|",
-    ])
+    ]
 
     for item in results:
         lines.append(
@@ -115,12 +119,16 @@ def write_reports(
             f"{item['retries']} | {item['row_count']} |"
         )
 
-    failures = [item for item in results if not item["success"]]
+    failures = [
+        item for item in results
+        if not item["success"] or not item["result_match"]
+    ]
 
     if failures:
-        lines.extend(["", "## Failures", ""])
+        lines.extend(["", "## Failures and mismatches", ""])
         for item in failures:
-            lines.append(f"- **{item['id']}**: {item['error']}")
+            reason = item["error"] or "Generated SQL returned different results"
+            lines.append(f"- **{item['id']}**: {reason}")
 
     lines.extend([
         "",
@@ -146,6 +154,29 @@ def write_reports(
     )
 
 
+def is_transient_provider_error(error: Exception) -> bool:
+    """Identify provider errors that may succeed on another attempt."""
+    message = str(error).lower()
+
+    transient_phrases = (
+        "network request failed",
+        "server disconnected",
+        "timed out",
+        "returned an empty response",
+        "timeout",
+        "temporarily unavailable",
+        "connection reset",
+        "connection refused",
+        "api error 429",
+        "api error 500",
+        "api error 502",
+        "api error 503",
+        "api error 504",
+    )
+
+    return any(phrase in message for phrase in transient_phrases)
+
+
 def main() -> None:
     settings = Settings.from_env()
     llm = LLMClient(settings)
@@ -168,7 +199,6 @@ def main() -> None:
 
     last_request_time: float | None = None
     results: list[dict[str, Any]] = []
-    stop_reason: str | None = None
 
     for item in dataset:
         question_id = item["id"]
@@ -185,22 +215,57 @@ def main() -> None:
             "error": None,
         }
 
-        # Pace requests to avoid exceeding requests-per-minute limits.
-        if last_request_time is not None:
-            elapsed = time.monotonic() - last_request_time
-            wait_seconds = request_interval - elapsed
+        generated_sql: str | None = None
 
-            if wait_seconds > 0:
-                print(
-                    f"Waiting {wait_seconds:.1f}s before the next API request..."
-                )
-                time.sleep(wait_seconds)
+        # Attempt SQL generation up to three times for transient errors.
+        for attempt in range(MAX_PROVIDER_ATTEMPTS):
+            if last_request_time is not None:
+                elapsed = time.monotonic() - last_request_time
+                wait_seconds = request_interval - elapsed
 
-        last_request_time = time.monotonic()
+                if wait_seconds > 0:
+                    print(
+                        f"Waiting {wait_seconds:.1f}s before the next API request..."
+                    )
+                    time.sleep(wait_seconds)
+
+            last_request_time = time.monotonic()
+
+            try:
+                generated_sql = llm.generate_sql(question, schema)
+                break
+
+            except LLMConfigurationError as error:
+                record["error"] = str(error)
+                break
+
+            except LLMProviderError as error:
+                record["error"] = str(error)
+
+                if (
+                    is_transient_provider_error(error)
+                    and attempt < MAX_PROVIDER_ATTEMPTS - 1
+                ):
+                    record["retries"] += 1
+                    print(
+                        f"{question_id}: temporary provider error. "
+                        f"Retry {record['retries']}/"
+                        f"{MAX_PROVIDER_ATTEMPTS - 1}."
+                    )
+                    continue
+
+                break
+
+        if generated_sql is None:
+            results.append(record)
+            print(
+                f"{question_id}: success=False "
+                f"result_match=False retries={record['retries']} "
+                f"error={record['error']}"
+            )
+            continue
 
         try:
-            generated_sql = llm.generate_sql(question, schema)
-
             validation = validate_select_only(
                 generated_sql,
                 settings.max_query_rows,
@@ -210,50 +275,32 @@ def main() -> None:
                 record["error"] = (
                     validation.error or "SQL validation failed"
                 )
-                results.append(record)
-
-                print(
-                    f"{question_id}: success=False "
-                    "result_match=False retries=0"
+            else:
+                actual_rows, actual_truncated = execute_read_only(
+                    validation.sql,
+                    settings.database_path,
+                    max_rows=settings.max_query_rows,
+                    timeout_seconds=settings.query_timeout_seconds,
                 )
-                continue
 
-            actual_rows, actual_truncated = execute_read_only(
-                validation.sql,
-                settings.database_path,
-                max_rows=settings.max_query_rows,
-                timeout_seconds=settings.query_timeout_seconds,
-            )
+                expected_rows, expected_truncated = execute_read_only(
+                    item["expected_sql"],
+                    settings.database_path,
+                    max_rows=settings.max_query_rows,
+                    timeout_seconds=settings.query_timeout_seconds,
+                )
 
-            expected_rows, expected_truncated = execute_read_only(
-                item["expected_sql"],
-                settings.database_path,
-                max_rows=settings.max_query_rows,
-                timeout_seconds=settings.query_timeout_seconds,
-            )
-
-            record.update({
-                "success": True,
-                "result_match": results_match(
-                    actual_rows,
-                    expected_rows,
-                    actual_truncated,
-                    expected_truncated,
-                ),
-                "row_count": len(actual_rows),
-                "sql": validation.sql,
-            })
-
-        except (LLMProviderError, LLMConfigurationError) as error:
-            record["error"] = str(error)
-            results.append(record)
-
-            # Stop immediately rather than wasting further provider requests.
-            stop_reason = (
-                f"Stopped at {question_id} after a provider error: {error}"
-            )
-            print(f"\n{stop_reason}")
-            break
+                record.update({
+                    "success": True,
+                    "result_match": results_match(
+                        actual_rows,
+                        expected_rows,
+                        actual_truncated,
+                        expected_truncated,
+                    ),
+                    "row_count": len(actual_rows),
+                    "sql": validation.sql,
+                })
 
         except (QueryExecutionError, ValueError) as error:
             record["error"] = str(error)
@@ -263,20 +310,25 @@ def main() -> None:
         print(
             f"{question_id}: "
             f"success={record['success']} "
-            f"result_match={record['result_match']} retries=0"
+            f"result_match={record['result_match']} "
+            f"retries={record['retries']}"
         )
 
     write_reports(
         results,
         len(dataset),
-        stop_reason,
         settings,
     )
+
+    successful = sum(bool(item["success"]) for item in results)
+    matched = sum(bool(item["result_match"]) for item in results)
 
     print(
         f"\nEvaluation finished: {len(results)}/{len(dataset)} "
         "questions attempted."
     )
+    print(f"Successful executions: {successful}/{len(dataset)}")
+    print(f"Correct result matches: {matched}/{len(dataset)}")
     print("Wrote reports/eval_results.md")
     print("Wrote reports/eval_results.json")
 

@@ -19,3 +19,7 @@ htmlcov/
 .DS_Store
 .vscode/
 .idea/
+
+# Local environment backups
+.env.*
+!.env.example
