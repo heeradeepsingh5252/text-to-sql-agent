@@ -23,3 +23,10 @@ htmlcov/
 # Local environment backups
 .env.*
 !.env.example
+
+# Local frontend backups
+streamlit_app_backup.py
+
+# Streamlit agent skills
+.agents/skills/developing-with-streamlit
+.claude/skills/developing-with-streamlit

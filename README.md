@@ -15,8 +15,34 @@ A schema-aware natural-language-to-SQL application for a **synthetic** pharmaceu
 - Up to two SQL correction retries after the first attempt.
 - Plain-English answer generated from the original question and returned rows.
 - FastAPI `/health`, `/schema`, and `/ask` endpoints, plus basic in-process rate limiting.
+- Modern Streamlit dashboard with conversational queries, generated SQL, KPI cards, and interactive result tables.
 - Mocked tests. The test suite does not call a real LLM API.
 - 20-question evaluation runner that records measured execution success, result matches, retry count, and failures.
+
+## Application Screenshots
+
+### Dashboard
+![Pharma Intelligence Dashboard](screenshots/01-dashboard.png)
+
+### AI-generated answer
+![AI Query Answer](screenshots/02-query-answer.png)
+
+### Generated SQL and query results
+![Generated SQL and Results](screenshots/03-sql-and-results.png)
+
+## Frontend
+
+The application includes a Streamlit-based user interface connected to the FastAPI backend.
+
+Frontend capabilities:
+- Natural-language chat interface.
+- Suggested pharmaceutical analytics questions.
+- Live backend and database status.
+- AI-generated SQL with syntax highlighting.
+- Query metrics including rows returned, retries, and truncation.
+- Tabular presentation of database results.
+
+Frontend technologies: Streamlit, Pandas, HTTPX, and custom CSS.
 
 ## Architecture
 
@@ -93,6 +119,18 @@ PYTHONPATH=src python -m uvicorn app.main:app --reload --port 8000
 
 Open the interactive API documentation at `http://127.0.0.1:8000/docs`.
 
+### Launch the Streamlit frontend
+
+Keep the FastAPI backend running. Open a second terminal, activate the virtual environment, and run:
+
+```bash
+streamlit run streamlit_app.py
+```
+
+Open the local URL printed by Streamlit, usually `http://localhost:8501`.
+
+The frontend communicates with the backend at `http://localhost:8000` by default. To override this, set the `API_BASE_URL` environment variable.
+
 ### API examples
 
 Health:
@@ -141,7 +179,15 @@ After configuring an API key, run:
 PYTHONPATH=src python scripts/run_evaluation.py
 ```
 
-The 20-question benchmark compares the generated query's result rows against rows returned by a reference SQL query. It reports execution success, result matches, average retries and failures. It writes actual run results to `reports/eval_results.md` and `reports/eval_results.json`. **No accuracy numbers are claimed until this script has been run.** This small benchmark measures behavior on the included synthetic dataset, not production-grade generalization.
+The 20-question benchmark compares the generated query's result rows against rows returned by reference SQL queries. It reports execution success, result matches, average retries and failures. It writes actual run results to `reports/eval_results.md` and `reports/eval_results.json`.
+
+Latest recorded benchmark run:
+- Questions attempted: 20/20
+- Successful executions: 20/20
+- Correct result matches: 20/20
+- Result-match rate: 100%
+
+These results apply only to the included 20-question benchmark and synthetic dataset. They do not establish production-grade accuracy or generalization.
 
 ## Docker
 
