@@ -1,1 +1,1 @@
-"""Text-to-SQL Agent application package."""
+"""Pharma Text-to-SQL Agent."""

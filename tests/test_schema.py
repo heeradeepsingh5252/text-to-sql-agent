@@ -1,5 +1,4 @@
 """Tests for synthetic database creation and SQLite schema introspection."""
-
 from pathlib import Path
 
 import pytest
@@ -23,24 +22,10 @@ def test_database_contains_expected_tables(pharma_db: Path) -> None:
 
 def test_schema_contains_expected_columns(pharma_db: Path) -> None:
     description = get_schema_description(pharma_db)
-    expected_columns = (
-        "product_id",
-        "product_name",
-        "category",
-        "unit_cost",
-        "list_price",
-        "transaction_id",
-        "transaction_date",
-        "region",
-        "units_sold",
-        "revenue",
-        "estimated_gross_profit",
-        "margin_pct",
-        "snapshot_date",
-        "stock_on_hand",
-        "reorder_flag",
-    )
-    for column in expected_columns:
+    for column in ("product_id", "product_name", "category", "unit_cost", "list_price",
+                   "transaction_id", "transaction_date", "region", "units_sold", "revenue",
+                   "estimated_gross_profit", "margin_pct", "snapshot_date", "stock_on_hand",
+                   "reorder_flag"):
         assert column in description
 
 
@@ -53,7 +38,6 @@ def test_schema_contains_sample_rows_and_relationships(pharma_db: Path) -> None:
 
 def test_database_has_deterministic_row_counts(pharma_db: Path) -> None:
     import sqlite3
-
     with sqlite3.connect(pharma_db) as connection:
         assert connection.execute("SELECT COUNT(*) FROM products").fetchone()[0] == 8
         assert connection.execute("SELECT COUNT(*) FROM sales_transactions").fetchone()[0] == 600

@@ -1,4 +1,4 @@
-.PHONY: install test lint run db schema
+.PHONY: install test lint run db schema evaluate
 
 install:
 	python -m pip install -r requirements-dev.txt
@@ -17,3 +17,6 @@ db:
 
 schema:
 	PYTHONPATH=src python scripts/print_schema.py
+
+evaluate:
+	PYTHONPATH=src python scripts/run_evaluation.py
